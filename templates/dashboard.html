@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Study Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <p>Welcome, {{ username }}!</p>
+    <p><a href="/logout">Logout</a></p>
+    <div class="container">
+        <header>
+            <h1>Dashboard</h1>
+            <p>Welcome, {{ username }}! <a href="/logout" class="secondary">Logout</a></p>
+        </header>
+
+        {% if session.get('history') %}
+        <section>
+            <h2>Your recent calculations</h2>
+            <ul class="history">
+                {% for item in session.history %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% else %}
+        <p>No calculations yet. Try the adder on the home page.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
