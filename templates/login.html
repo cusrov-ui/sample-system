@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Study Hub</title>
-</head>
-<body>
-    <h1>Login</h1>
-    <form action="/login" method="post">
+{% extends 'base.html' %}
+
+{% block title %}Login - Study Hub{% endblock %}
+
+{% block content %}
+    <h2>Login</h2>
+    <form action="/login" method="post" class="card">
         <label>Username: <input type="text" name="username"></label><br>
         <label>Password: <input type="password" name="password"></label><br>
         <button type="submit">Login</button>
     </form>
-    <p><a href="/register">Don't have an account? Register</a></p>
-</body>
-</html>
+    <p><a href="/register">Don't have an account? Create one to save your studies and game history.</a></p>
+{% endblock %}

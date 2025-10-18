@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Play - Study Hub{% endblock %}
+
+{% block content %}
+    <h2>Tic-Tac-Toe (XO)</h2>
+    <p>Play against another logged-in user or the built-in bot. Anonymous games are stored in your browser session.</p>
+
+    <section class="card">
+        <div class="game-controls">
+            <select id="opponent-select">
+                <option value="human">Human</option>
+                <option value="bot">Bot</option>
+            </select>
+            <button id="btn-new">New Game</button>
+            <button id="btn-refresh">Refresh List</button>
+        </div>
+
+    <div id="games-list"></div>
+
+        <div id="game-area" style="display:none; margin-top:12px;">
+            <h3 id="game-title">Game</h3>
+            <div id="board" class="ttt-board"></div>
+            <p id="game-info"></p>
+            <button id="btn-back">Back to list</button>
+            <button id="btn-delete">Delete game</button>
+        </div>
+    </section>
+
+    <p><a href="/">Home</a></p>
+
+    <script>
+    // Minimal frontend for games
+    const gamesListEl = document.getElementById('games-list');
+    const gameArea = document.getElementById('game-area');
+    const boardEl = document.getElementById('board');
+    const gameTitle = document.getElementById('game-title');
+    const gameInfo = document.getElementById('game-info');
+    let currentGame = null;
+
+    function el(tag, cls){ const d = document.createElement(tag); if(cls) d.className = cls; return d }
+
+    async function api(path, opts){
+        const res = await fetch(path, opts);
+        const json = await res.json().catch(()=>({}));
+        if(!res.ok) throw json;
+        return json;
+    }
+
+    async function refreshList(){
+        gamesListEl.innerHTML = 'Loading...';
+        try{
+            const games = await api('/api/games');
+            gamesListEl.innerHTML = '';
+            if(games.length===0) gamesListEl.textContent = 'No games yet — create a new one.';
+            games.forEach(g=>{
+                const row = el('div','game-row');
+                row.textContent = `ID: ${g.id} — turn: ${g.turn} — status: ${g.status}`;
+                const btn = el('button'); btn.textContent='Open'; btn.onclick=()=>openGame(g.id);
+                row.appendChild(btn);
+                gamesListEl.appendChild(row);
+            });
+        }catch(e){ gamesListEl.textContent = 'Error loading games (are you logged in?).' }
+    }
+
+    async function newGame(){
+        try{
+            const opponent = document.getElementById('opponent-select').value;
+            const j = await api('/api/games', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({opponent})});
+            refreshList();
+            openGame(j.id);
+        }catch(e){ alert('Could not create game: '+(e.error||JSON.stringify(e))) }
+    }
+
+    async function openGame(id){
+        try{
+            const j = await api(`/api/games/${id}`);
+            currentGame = j;
+            showGame(j);
+        }catch(e){ alert('Could not open: '+(e.error||JSON.stringify(e))) }
+    }
+
+    function showGame(j){
+        gameArea.style.display='block';
+        gamesListEl.style.display='none';
+        gameTitle.textContent = `Game ${j.id}`;
+        renderBoard(j.game.board);
+        updateInfo(j.game);
+    }
+
+    function renderBoard(board){
+        boardEl.innerHTML='';
+        boardEl.style.gridTemplateColumns='repeat(3, 64px)';
+        boardEl.style.display='grid';
+        board.forEach((cell,i)=>{
+            const c = el('div','ttt-cell');
+            c.textContent = cell || '';
+            c.dataset.pos = i;
+            c.onclick = ()=>cellClicked(i);
+            boardEl.appendChild(c);
+        });
+    }
+
+    async function cellClicked(pos){
+        if(!currentGame) return;
+        const gid = currentGame.id;
+        try{
+            const j = await api(`/api/games/${gid}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pos})});
+            currentGame = j;
+            renderBoard(j.game.board);
+            updateInfo(j.game);
+        }catch(e){ alert('Move failed: '+(e.error||JSON.stringify(e))); }
+    }
+
+    function updateInfo(game){
+        gameInfo.textContent = `Turn: ${game.turn} — Status: ${game.status}`;
+    }
+
+    document.getElementById('btn-new').onclick = newGame;
+    document.getElementById('btn-refresh').onclick = refreshList;
+    document.getElementById('btn-back').onclick = ()=>{ gameArea.style.display='none'; gamesListEl.style.display='block'; currentGame=null };
+    document.getElementById('btn-delete').onclick = async ()=>{
+        if(!currentGame) return; if(!confirm('Delete this game?')) return;
+        try{ await api(`/api/games/${currentGame.id}`, {method:'DELETE'}); currentGame=null; gameArea.style.display='none'; gamesListEl.style.display='block'; refreshList(); }catch(e){ alert('Delete failed') }
+    }
+
+    // initial load
+    refreshList();
+    </script>
+{% endblock %}

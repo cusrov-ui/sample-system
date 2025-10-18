@@ -1,33 +1,187 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Study Hub</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <h1>Dashboard</h1>
-    <p>Welcome, {{ username }}!</p>
-    <p><a href="/logout">Logout</a></p>
-    <div class="container">
-        <header>
-            <h1>Dashboard</h1>
-            <p>Welcome, {{ username }}! <a href="/logout" class="secondary">Logout</a></p>
-        </header>
+{% extends 'base.html' %}
 
-        {% if session.get('history') %}
-        <section>
-            <h2>Your recent calculations</h2>
-            <ul class="history">
-                {% for item in session.history %}
-                <li>{{ item }}</li>
-                {% endfor %}
+{% block title %}Dashboard - Study Hub{% endblock %}
+
+{% block content %}
+    <h2>Dashboard</h2>
+    <p>Welcome back, <strong>{{ username }}</strong>!</p>
+
+    <section class="card">
+        <h3>Create a study</h3>
+        <form id="create-study-form" action="/add" method="post">
+            <input id="study_name" type="text" name="study_name" placeholder="Study name" required>
+            <input id="description" type="text" name="description" placeholder="Short description">
+            <input id="schedule" type="text" name="schedule" placeholder="Schedule (optional) — e.g. Mon 18:00">
+            <label><input id="public" type="checkbox" name="public"> Make public (anyone can join)</label>
+            <button id="create-btn" type="submit">Create</button>
+        </form>
+        <div id="create-result" style="margin-top:8px"></div>
+    </section>
+
+    <!-- Inline members panel (appears alongside owned studies) -->
+    <section id="members-panel" class="card" style="display:none;">
+        <h3>Members</h3>
+        <div id="members-list"></div>
+        <div style="margin-top:10px"><button id="members-close">Close</button></div>
+    </section>
+
+    <section class="card">
+        <h3>Search public studies</h3>
+        <div class="form-inline">
+            <input id="search-q" type="text" placeholder="Search studies">
+            <button id="btn-search">Search</button>
+        </div>
+        <div id="search-results"></div>
+    </section>
+
+    <section class="card">
+        <h3>Your owned studies</h3>
+        {% if owned %}
+            <ul id="owned-list" class="history">
+            {% for s in owned %}
+                <li>
+                    <strong>{{ s['name'] }}</strong> — {{ s['description'] or '' }} <br>
+                    <small>{{ s['schedule'] or '' }}</small>
+                    <div style="margin-top:6px">
+                        <form class="delete-study-form" data-id="{{ s['id'] }}" action="/study/{{ s['id'] }}/delete" method="post" style="display:inline">
+                            <button class="btn-delete-study" type="submit">Delete</button>
+                        </form>
+                        <button class="btn-manage" data-id="{{ s['id'] }}">Manage members</button>
+                        {% if s['pending_count'] and s['pending_count'] > 0 %}
+                            <span class="badge">{{ s['pending_count'] }} pending</span>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
             </ul>
-        </section>
         {% else %}
-        <p>No calculations yet. Try the adder on the home page.</p>
+            <p>You don't own any studies yet — create one using the form above.</p>
         {% endif %}
-    </div>
-</body>
-</html>
+    </section>
+
+    <section class="card">
+        <h3>Studies you've joined</h3>
+        {% if joined %}
+            <ul id="joined-list" class="history">
+            {% for s in joined %}
+                <li>
+                    <strong>{{ s['name'] }}</strong> — {{ s['description'] or '' }} <br>
+                    <small>{{ s['schedule'] or '' }}</small>
+                    <button class="btn-leave" data-id="{{ s['id'] }}">Leave</button>
+                </li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>You haven't joined any studies yet.</p>
+        {% endif %}
+    </section>
+
+    <script>
+    async function api(path, opts){
+        const res = await fetch(path, opts);
+        return res.json();
+    }
+    // Members panel is inline (#members-panel already present in the DOM)
+
+    async function showMembers(studyId){
+        const listEl = document.getElementById('members-list');
+        listEl.innerHTML = 'Loading...';
+        try{
+            const members = await api('/study/'+studyId+'/members');
+            if(!members || members.length===0) listEl.textContent = 'No members.';
+            else{
+                listEl.innerHTML = '';
+                members.forEach(m=>{
+                    const row = document.createElement('div');
+                    row.innerHTML = `<strong>${m.username}</strong> — ${m.status} ${m.joined_at?(' — '+m.joined_at):''}`;
+                    if(m.status==='pending'){
+                        const btnA = document.createElement('button'); btnA.textContent='Approve'; btnA.onclick=async ()=>{ await fetch('/study/'+studyId+'/approve', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'username='+encodeURIComponent(m.username)}); await refreshOwned(); showMembers(studyId); };
+                        const btnD = document.createElement('button'); btnD.textContent='Deny'; btnD.onclick=async ()=>{ await fetch('/study/'+studyId+'/deny', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'username='+encodeURIComponent(m.username)}); await refreshOwned(); showMembers(studyId); };
+                        row.appendChild(btnA); row.appendChild(btnD);
+                    } else {
+                        const btnL = document.createElement('button'); btnL.textContent='Remove'; btnL.onclick=async ()=>{ await fetch('/study/'+studyId+'/deny', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'username='+encodeURIComponent(m.username)}); await refreshOwned(); showMembers(studyId); };
+                        row.appendChild(btnL);
+                    }
+                    listEl.appendChild(row);
+                });
+            }
+            document.getElementById('members-panel').style.display='block';
+            document.getElementById('members-panel').scrollIntoView({behavior:'smooth'});
+        }catch(e){ listEl.textContent='Error loading members'; }
+    }
+
+        document.addEventListener('click', function(e){ if(e.target && e.target.classList && e.target.classList.contains('btn-manage')){ const id=e.target.dataset.id; showMembers(id); }});
+        document.addEventListener('click', function(e){ if(e.target && e.target.id==='members-close'){ document.getElementById('members-panel').style.display='none'; }});
+
+    // AJAX create study
+    document.getElementById('create-study-form').onsubmit = async function(ev){
+        ev.preventDefault();
+        const payload = {
+            study_name: document.getElementById('study_name').value,
+            description: document.getElementById('description').value,
+            schedule: document.getElementById('schedule').value,
+            public: document.getElementById('public').checked ? 'on' : ''
+        };
+        document.getElementById('create-btn').disabled = true;
+        try{
+            const res = await fetch('/add', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'}, body: new URLSearchParams(payload)});
+            const j = await res.json().catch(()=>null);
+            if(res.ok && j){
+                // creation successful — reload to show server state
+                location.reload();
+            }else{
+                document.getElementById('create-result').textContent = 'Could not create study.';
+            }
+        }catch(err){ document.getElementById('create-result').textContent = 'Error creating study.' }
+        document.getElementById('create-btn').disabled = false;
+    }
+
+    // Inline delete handler
+    document.addEventListener('submit', function(e){ if(e.target && e.target.classList && e.target.classList.contains('delete-study-form')){ e.preventDefault(); if(!confirm('Delete this study?')) return; const id = e.target.dataset.id; fetch(e.target.action, {method:'POST'}).then(async r=>{ if(r.ok){ location.reload(); } else { alert('Delete failed'); } }); }});
+
+    // Inline join/leave handlers
+    document.getElementById('btn-search').onclick = async ()=>{
+        const q = document.getElementById('search-q').value;
+        const results = await api('/api/studies/search?q='+encodeURIComponent(q));
+        const el = document.getElementById('search-results'); el.innerHTML='';
+        if(results.length===0) el.textContent='No studies found.';
+        results.forEach(s=>{
+            const row = document.createElement('div');
+            row.innerHTML = `<strong>${s.name}</strong> — ${s.description||''} <button data-id="${s.id}" class="btn-join">Join</button>`;
+            el.appendChild(row);
+        });
+        document.querySelectorAll('.btn-join').forEach(btn=>btn.onclick=async (e)=>{
+            const id = e.target.dataset.id; const res = await api('/study/'+id+'/join',{method:'POST'});
+            if(res && res.status){
+                // reload to reflect server-side membership state
+                location.reload();
+            } else alert('Join failed');
+        });
+    }
+    document.querySelectorAll('.btn-leave').forEach(btn=>btn.onclick=async (e)=>{
+        const id = e.target.dataset.id; const res = await api('/study/'+id+'/leave',{method:'POST'});
+        if(res && res.status === 'left'){
+            location.reload();
+        } else alert('Leave failed');
+    });
+
+    // helper to refresh owned studies list (fetch dashboard fragment)
+    async function refreshOwned(){
+        try{
+            const res = await fetch('/api/owned_studies');
+            if(!res.ok) return;
+            const data = await res.json();
+            const el = document.getElementById('owned-list');
+            if(!el) return;
+            el.innerHTML = '';
+            data.forEach(s=>{
+                const li = document.createElement('li');
+                li.dataset.id = s.id;
+                const pendingHtml = (s.pending_count && s.pending_count>0) ? `<span class="badge">${s.pending_count} pending</span>` : `<span class="badge" style="display:none">0 pending</span>`;
+                li.innerHTML = `<strong>${s.name}</strong> — ${s.description||''} <br><small>${s.schedule||''}</small><div style="margin-top:6px"><form class="delete-study-form" data-id="${s.id}" action="/study/${s.id}/delete" method="post" style="display:inline"><button class="btn-delete-study" type="submit">Delete</button></form><button class="btn-manage" data-id="${s.id}">Manage members</button>${pendingHtml}</div>`;
+                el.appendChild(li);
+            });
+        }catch(e){ console.warn('refreshOwned failed', e); }
+    }
+    </script>
+{% endblock %}

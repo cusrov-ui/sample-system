@@ -5,31 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Result</title>
     <link rel="stylesheet" href="/static/style.css">
-+</head>
+</head>
 <body>
     <div class="container">
-+        <h1>Calculation Result</h1>
-+
-+        {% if result is string %}
-+            <div class="flash">{{ result }}</div>
-+        {% else %}
-+            <div class="result">Result: {{ result }}</div>
-+        {% endif %}
-+
-+        <p><a href="/">Back to Home</a></p>
-+
-+        {% if session.history %}
-+        <section class="history">
-+            <h3>Recent calculations</h3>
-+            <ul>
-+                {% for item in session.history %}
-+                <li>{{ item }}</li>
-+                {% endfor %}
-+            </ul>
-+        </section>
-+        {% endif %}
-+    </div>
-+</body>
-+</html>
-+
-+
+    <h1>Result</h1>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for msg in messages %}
+                    <li class="flash">{{ msg }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <p><a href="/">Back to Home</a></p>
+    </div>
+</body>
+</html>
+
