@@ -56,3 +56,12 @@ Notes:
 
 ## Security & production notes
 - This is a demo. For production, use a real database, secure secrets via environment variables, enable CSRF protection, and harden authentication.
+
+## Inspecting who wrote each line
+If you want to see who last edited each line of a file in this repository you can use the included helper.
+
+```powershell
+python tools/annotate_authors.py app.py
+```
+
+This prints each line with the git author who last touched it. It requires that the repository has git history (the file is tracked).

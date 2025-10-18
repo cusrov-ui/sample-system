@@ -449,12 +449,12 @@ def api_move(gid):
     board[pos] = player
 
     # check winner
-    def check_winner(b):
+    def check_winner(board_state):
         lines = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
-        for a,b,c in lines:
-            if b[a] and b[a] == b[b] == b[c]:
-                return b[a]
-        if all(b):
+        for i,j,k in lines:
+            if board_state[i] and board_state[i] == board_state[j] == board_state[k]:
+                return board_state[i]
+        if all(board_state):
             return 'draw'
         return None
 
